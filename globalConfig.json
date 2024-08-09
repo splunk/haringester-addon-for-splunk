@@ -276,7 +276,7 @@
     "meta": {
         "name": "haringester_addon_for_splunk",
         "restRoot": "haringester_addon_for_splunk",
-        "version": "0.2.12",
+        "version": "0.2.14",
         "displayName": "HAR Ingestor Add-on for Splunk",
         "schemaVersion": "0.0.3"
     }

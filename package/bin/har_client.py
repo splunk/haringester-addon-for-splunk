@@ -1,5 +1,6 @@
 import requests, sys, time, traceback
 from datetime import datetime
+from har_utils import write_events
 
 epoch = datetime(1970, 1, 1)
 
@@ -52,48 +53,12 @@ class HarIngester(object):
             sys.exit()
         return None
 
-    def get_run_time(self, check_name) -> list:
-        runtimes_url = f"{self.o11y_url}/v1/timeserieswindow?resolution=1000&startMs={LAST_HALF_HOUR}000&endMS={NOW_EPOCH}000&query=(sf_metric%3Asynthetics.run.duration.time.ms)%20AND%20(test_id%3A{self.synthetics_test_id})%20AND%20(location_id%3A{self.synthetics_runlocation})%20AND%20(sf_product%3Asynthetics)"
-        test_list = []
-        self._logger.debug(
-            f"Collecting run times for {self.synthetics_test_id} using {runtimes_url}"
-        )
-        get_run_time = self.fetch_data(runtimes_url, "")
-        if not get_run_time:
-            self._logger.warning(f"No run data found, exiting.")
-            sys.exit()
-        if not get_run_time.get("data"):
-            self._logger.warning(f"No run data found for {LAST_HALF_HOUR}, exiting.")
-            sys.exit()
-        for k, v in get_run_time["data"].items():
-
-            ts = int(v[-1][0])
-            test_list.append(
-                {
-                    "test_id": self.synthetics_test_id,
-                    "test_name": check_name,
-                    "last_test_run": ts,
-                    "location_list": [self.synthetics_runlocation],
-                }
-            )
-            return test_list
-
     def get_artifacts(self, active_tests: dict) -> list:
         test_id = active_tests.get("test_id")
         run_epoch = active_tests.get("last_test_run")
         location_list = active_tests.get("location_list")
         artifact_list = self.batch_location_artifacts(test_id, location_list, run_epoch)
 
-        """
-        for test in active_tests.get("location_list"):
-            synthetics_runlocation = test
-            artifacts_url = f"{self.o11y_url}/v2/synthetics/tests/{test_id}/artifacts?locationId={synthetics_runlocation}&timestamp={run_epoch}"
-            artifacts_req = self.fetch_data(artifacts_url, "")
-            artifact_list = artifacts_req
-
-            if not artifact_list.get("artifacts"):
-                continue
-        """
         for artifact in artifact_list["artifacts"]:
             if artifact.get("type") != "har":
                 continue
@@ -165,12 +130,12 @@ class HarIngester(object):
         params = {"active": True, "testType": "browser", "lastRunStatus": "success"}
 
         response = self.fetch_data(checks_url, params)
-
+        test_list = []
         if not response.get("tests"):
             return None
 
         if "tests" in response:
-            test_list = []
+
             for test in response.get("tests"):
                 if not test["lastRunAt"]:
                     self._logger.warning(f'No run history for {test["id"]}')
@@ -192,33 +157,10 @@ class HarIngester(object):
                     }
                 )
 
-            return test_list
-
-    def get_single_test(self) -> str:
-
-        test_url = (
-            f"{self.o11y_url}/v2/synthetics/tests/browser/{self.synthetics_test_id}"
-        )
-        browser_check = self.fetch_data(test_url, "")
-        if not browser_check:
-            self._logger.warning(
-                "Check not found - please check Synthetics configuration in Splunk Observability Cloud"
-            )
-            return None
-        if browser_check["test"].get(
-            "active"
-        ) and self.synthetics_runlocation in browser_check["test"].get("locationIds"):
-            check_name = browser_check["test"].get("name")
-            self._logger.info(browser_check)
-            return f'"{check_name}"'
-        else:
-            self._logger.warning(
-                "Check not active or location not matched - please check Synthetics configuration in Splunk Observability Cloud"
-            )
-            sys.exit()
+        return test_list
 
 
-def run_poll(config, logger):
+def run_poll(config, logger, event_writer):
     client = HarIngester(config, logger)
     get_active = client.get_active_checks()
     # get_active = client.get_single_test()
@@ -230,4 +172,5 @@ def run_poll(config, logger):
         if len(har_url) > 0:
             test_id = test.get("test_id")
             test_name = test.get("test_name")
-            return client.get_har(test_id, test_name, har_url)
+            data = client.get_har(test_id, test_name, har_url)
+            write_events(data, config, logger, event_writer)

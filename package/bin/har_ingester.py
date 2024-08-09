@@ -92,30 +92,14 @@ class Input(smi.Script):
                     "access_token": access_token,
                     "synthetics_test_id": synthetics_test_id,
                     "synthetics_runlocation": synthetics_runlocation,
+                    "index": input_item.get("index"),
+                    "input_name": input_name,
                 }
 
-                data = run_poll(config, logger)
+                data = run_poll(config, logger, event_writer)
 
-                sourcetype = "splunk:synthetics:har"
-                if len(data) > 0:
-                    for line in data:
-                        event_writer.write_event(
-                            smi.Event(
-                                data=json.dumps(line, ensure_ascii=False, default=str),
-                                index=input_item.get("index"),
-                                sourcetype=sourcetype,
-                            )
-                        )
-                    log.events_ingested(
-                        logger,
-                        input_name,
-                        sourcetype,
-                        len(data),
-                        input_item.get("index"),
-                    )
-                    log.modular_input_end(logger, input_name)
-                else:
-                    logger.warn("No data found.")
+                log.modular_input_end(logger, input_name)
+
             except Exception as e:
                 logger.error(
                     f"Exception raised while ingesting data for "
