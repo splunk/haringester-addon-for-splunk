@@ -20,6 +20,20 @@ class HarIngester(object):
         self.synthetics_runlocation = config["synthetics_runlocation"]
         self._logger = logger
 
+    def batch_location_artifacts(
+        self, test_id: int, locations: list, epoch_time: int
+    ) -> dict:
+        with requests.Session() as s:
+            s.headers = self.header
+            for location in locations:
+                artifact_url = f"{self.o11y_url}/v2/synthetics/tests/{test_id}/artifacts?locationId={location}&timestamp={epoch_time}"
+                artifacts_req = s.get(artifact_url)
+                artifacts = artifacts_req.json()
+                if not artifacts.get("artifacts"):
+                    continue
+                artifacts["location"] = location
+                return artifacts
+
     def fetch_data(self, url, params) -> dict:
         try:
             response = requests.get(url, headers=self.header, params=params)
@@ -30,10 +44,12 @@ class HarIngester(object):
 
         except requests.exceptions.HTTPError as e:
             self._logger.error(f"HTTP error occurred: {e}")
+            sys.exit()
         except Exception:
             self._logger.error(
                 f"Failure occurred while connecting to {url}.\nTraceback: {traceback.format_exc()}"
             )
+            sys.exit()
         return None
 
     def get_run_time(self, check_name) -> list:
@@ -62,10 +78,13 @@ class HarIngester(object):
             )
             return test_list
 
-    def get_artifacts(self, active_tests: dict) -> str:
+    def get_artifacts(self, active_tests: dict) -> list:
         test_id = active_tests.get("test_id")
         run_epoch = active_tests.get("last_test_run")
+        location_list = active_tests.get("location_list")
+        artifact_list = self.batch_location_artifacts(test_id, location_list, run_epoch)
 
+        """
         for test in active_tests.get("location_list"):
             synthetics_runlocation = test
             artifacts_url = f"{self.o11y_url}/v2/synthetics/tests/{test_id}/artifacts?locationId={synthetics_runlocation}&timestamp={run_epoch}"
@@ -74,16 +93,18 @@ class HarIngester(object):
 
             if not artifact_list.get("artifacts"):
                 continue
-
-            for artifact in artifact_list["artifacts"]:
-                if artifact["type"] == "har":
-                    self._logger.debug(f"Found har artifact: {artifact['url']}")
-                    return artifact["url"]
+        """
+        for artifact in artifact_list["artifacts"]:
+            if artifact.get("type") != "har":
+                continue
+            # if artifact["type"] == "har":
+            self._logger.debug(f"Found har artifact: {artifact['url']}")
+            return [artifact["url"], artifact_list["location"]]
 
         return None
 
     def get_har(self, test_id, test_name, har_url) -> list:
-        full_har_url = f"{self.o11y_url}{har_url}"
+        full_har_url = f"{self.o11y_url}{har_url[0]}"
         har_data = self.fetch_data(full_har_url, "")
         if not har_data:
             sys.exit()
@@ -95,15 +116,17 @@ class HarIngester(object):
 
         har_data_arr = []
         for request in har_data["log"]["entries"]:
-            start_time = datetime.strptime(
-                request["startedDateTime"], "%Y-%m-%dT%H:%M:%S.%fZ"
+            start_time = (
+                datetime.strptime(request["startedDateTime"], "%Y-%m-%dT%H:%M:%S.%fZ")
+                - epoch
             )
-            start_time_epoch = int(start_time.timestamp() * 1000)
+            start_time_epoch = int(start_time.total_seconds() * 1000)
             har_data_dict = {
                 "time": start_time_epoch,
                 "time_taken": request["time"],
                 "test_id": test_id,
                 "test_name": test_name,
+                "test_location": har_url[1],
                 "resource": request["request"]["url"],
                 "content_type": request["response"]["content"].get("mimeType", ""),
                 "content_size": request["response"]["content"].get("size", 0),
@@ -143,13 +166,15 @@ class HarIngester(object):
 
         response = self.fetch_data(checks_url, params)
 
-        if not response:
+        if not response.get("tests"):
             return None
 
         if "tests" in response:
             test_list = []
             for test in response.get("tests"):
-
+                if not test["lastRunAt"]:
+                    self._logger.warning(f'No run history for {test["id"]}')
+                    continue
                 test_list.append(
                     {
                         "test_id": int(test["id"]),
@@ -167,7 +192,7 @@ class HarIngester(object):
                     }
                 )
 
-                return test_list
+            return test_list
 
     def get_single_test(self) -> str:
 
@@ -195,31 +220,14 @@ class HarIngester(object):
 
 def run_poll(config, logger):
     client = HarIngester(config, logger)
-    # get_active = client.get_active_checks()
-    get_active = client.get_single_test()
+    get_active = client.get_active_checks()
+    # get_active = client.get_single_test()
     if not get_active:
         logger.error("No active checks found.")
         sys.exit()
-
-    get_ts = client.get_run_time(get_active)
-
-    if not get_ts:
-        sys.exit()
-
-    for test in get_ts:
+    for test in get_active:
         har_url = client.get_artifacts(test)
-        if har_url:
+        if len(har_url) > 0:
             test_id = test.get("test_id")
             test_name = test.get("test_name")
             return client.get_har(test_id, test_name, har_url)
-
-
-# Potential future code
-"""
-for test in get_active:
-    har_url = client.get_artifacts(test)
-    if har_url:
-        test_id = test.get("test_id")
-        test_name = test.get("test_name")
-        print(json.dumps(client.get_har(test_id, test_name, har_url)))
-"""

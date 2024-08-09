@@ -76,12 +76,13 @@ class TestHarIngester(unittest.TestCase):
             f"No run data found for {LAST_HALF_HOUR}, exiting."
         )
 
-    @patch("bin.har_client.requests.get")
+    @patch("bin.har_client.requests.Session.get")
     def test_get_artifacts_success(self, mock_get):
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
-            "artifacts": [{"type": "har", "url": "https://fake.har.url"}]
+            "artifacts": [{"type": "har", "url": "https://fake.har.url"}],
+            "location": "fake_location",
         }
         mock_get.return_value = mock_response
 
@@ -91,13 +92,16 @@ class TestHarIngester(unittest.TestCase):
             "location_list": ["fake_location"],
         }
         result = self.ingester.get_artifacts(active_tests)
-        self.assertEqual(result, "https://fake.har.url")
+        self.assertEqual(result, ["https://fake.har.url", "fake_location"])
 
-    @patch("bin.har_client.requests.get")
+    @patch("bin.har_client.requests.Session.get")
     def test_get_artifacts_no_artifacts(self, mock_get):
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {"artifacts": []}
+        mock_response.json.return_value = {
+            "artifacts": [{"file": "d"}],
+            "location": "d",
+        }
         mock_get.return_value = mock_response
 
         active_tests = {
@@ -138,14 +142,17 @@ class TestHarIngester(unittest.TestCase):
             }
         }
         mock_get.return_value = mock_response
-
-        result = self.ingester.get_har("fake_test_id", "test_name", "/fake_har_url")
+        test_location = "blah"
+        result = self.ingester.get_har(
+            "fake_test_id", "test_name", ["/fake_har_url", test_location]
+        )
         expected_result = [
             {
                 "time": 1704067200000,
                 "time_taken": 100,
                 "test_id": "fake_test_id",
                 "test_name": "test_name",
+                "test_location": test_location,
                 "resource": "https://example.com/resource",
                 "content_type": "text/html",
                 "content_size": 1024,
@@ -165,6 +172,62 @@ class TestHarIngester(unittest.TestCase):
 
     @patch("bin.har_client.requests.get")
     def test_get_active_checks_success(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "tests": [
+                {
+                    "id": "1",
+                    "name": "Test 1",
+                    "lastRunAt": "2024-01-01T00:00:00.000Z",
+                    "locationIds": ["location_1"],
+                },
+                {
+                    "id": "2",
+                    "name": "Test 2",
+                    "lastRunAt": "2024-02-02T00:00:00.000Z",
+                    "locationIds": ["location_2"],
+                },
+            ]
+        }
+        mock_get.return_value = mock_response
+
+        epoch = datetime.utcfromtimestamp(0)
+        result = self.ingester.get_active_checks()
+        expected_result = [
+            {
+                "test_id": 1,
+                "test_name": "Test 1",
+                "last_test_run": round(
+                    (
+                        datetime.strptime(
+                            "2024-01-01T00:00:00.000Z", "%Y-%m-%dT%H:%M:%S.%fZ"
+                        )
+                        - epoch
+                    ).total_seconds()
+                    * 1000
+                ),
+                "location_list": ["location_1"],
+            },
+            {
+                "test_id": 2,
+                "test_name": "Test 2",
+                "last_test_run": round(
+                    (
+                        datetime.strptime(
+                            "2024-02-02T00:00:00.000Z", "%Y-%m-%dT%H:%M:%S.%fZ"
+                        )
+                        - epoch
+                    ).total_seconds()
+                    * 1000
+                ),
+                "location_list": ["location_2"],
+            },
+        ]
+        self.assertEqual(result, expected_result)
+
+    @patch("bin.har_client.requests.get")
+    def test_get_active_check_success(self, mock_get):
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
@@ -198,6 +261,18 @@ class TestHarIngester(unittest.TestCase):
             }
         ]
         self.assertEqual(result, expected_result)
+
+    @patch("bin.har_client.requests.get")
+    def test_get_active_check_empty(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"tests": []}
+        mock_get.return_value = mock_response
+
+        epoch = datetime.utcfromtimestamp(0)
+        result = self.ingester.get_active_checks()
+
+        self.assertIsNone(result)
 
     @patch("bin.har_client.requests.get")
     def test_get_single_test_success(self, mock_get):
