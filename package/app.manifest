@@ -1,7 +1,7 @@
 {
     "schemaVersion": "2.0.0",
     "info": {
-        "title": "HAR Ingestor Add-on for Splunk",
+        "title": "HAR Ingester Add-on for Splunk",
         "id": {
             "group": null,
             "name": "haringester_addon_for_splunk",
@@ -15,7 +15,7 @@
             }
         ],
         "releaseDate": null,
-        "description": "HAR Ingestor Add-on for Splunk",
+        "description": "HAR Ingester Add-on for Splunk",
         "classification": {
             "intendedAudience": "IT Professionals",
             "categories": [

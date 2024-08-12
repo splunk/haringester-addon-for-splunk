@@ -84,14 +84,10 @@ class Input(smi.Script):
                 access_token = account_config.get("access_token")
                 o11y_realm = account_config.get("so_realm")
                 o11y_url = f"https://api.{o11y_realm}.signalfx.com"
-                synthetics_test_id = input_item.get("requestedId")
-                synthetics_runlocation = input_item.get("run_location")
 
                 config = {
                     "o11y_url": o11y_url,
                     "access_token": access_token,
-                    "synthetics_test_id": synthetics_test_id,
-                    "synthetics_runlocation": synthetics_runlocation,
                     "index": input_item.get("index"),
                     "input_name": input_name,
                 }

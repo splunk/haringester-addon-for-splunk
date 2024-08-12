@@ -148,27 +148,6 @@
                             "required": true
                         },
                         {
-                            "type": "text",
-                            "label": "Synthetics Test ID",
-                            "required": true,
-                            "field": "requestedId",
-                            "help": "Enter a Synthetics Test ID",
-                            "validators": [
-                                {
-                                    "type": "regex",
-                                    "errorMsg": "Interval must be an integer.",
-                                    "pattern": "^\\-[1-9]\\d*$|^\\d*$"
-                                }
-                            ]
-                        },
-                        {
-                            "type": "text",
-                            "label": "Synthetics Run Location",
-                            "required": true,
-                            "field": "run_location",
-                            "help": "Enter a Synthetics Run Location for your test ID"
-                        },
-                        {
                             "type": "singleSelect",
                             "label": "Index Name",
                             "required": true,
@@ -207,14 +186,6 @@
                         "field": "name"
                     },
                     {
-                        "label": "Synthetics Test ID",
-                        "field": "requestedId"
-                    },
-                    {
-                        "label": "Synthetics Run Location",
-                        "field": "run_location"
-                    },
-                    {
                         "label": "Interval",
                         "field": "interval"
                     },
@@ -231,14 +202,6 @@
                     {
                         "label": "Name",
                         "field": "name"
-                    },
-                    {
-                        "label": "Synthetics Test ID",
-                        "field": "requestedId"
-                    },
-                    {
-                        "label": "Synthetics Run Location",
-                        "field": "run_location"
                     },
                     {
                         "label": "Interval",
@@ -276,8 +239,8 @@
     "meta": {
         "name": "haringester_addon_for_splunk",
         "restRoot": "haringester_addon_for_splunk",
-        "version": "0.2.14",
-        "displayName": "HAR Ingestor Add-on for Splunk",
+        "version": "0.2.15",
+        "displayName": "HAR Ingester Add-on for Splunk",
         "schemaVersion": "0.0.3"
     }
 }

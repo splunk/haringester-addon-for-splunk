@@ -17,8 +17,6 @@ class HarIngester(object):
             "X-SF-TOKEN": self.access_token,
         }
         self.o11y_url = config["o11y_url"]
-        self.synthetics_test_id = config["synthetics_test_id"]
-        self.synthetics_runlocation = config["synthetics_runlocation"]
         self._logger = logger
 
     def batch_location_artifacts(
