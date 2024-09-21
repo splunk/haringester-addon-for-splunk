@@ -7,7 +7,9 @@ from har_client import run_poll
 
 import import_declare_test
 from solnlib import conf_manager, log
+from solnlib.modular_input import KVStoreCheckpointer
 from splunklib import modularinput as smi
+from splunklib import binding
 
 ADDON_NAME = "haringester_addon_for_splunk"
 
@@ -45,6 +47,11 @@ class Input(smi.Script):
         scheme.add_argument(
             smi.Argument(
                 "name", title="Name", description="Name", required_on_create=True
+            )
+        )
+        scheme.add_argument(
+            smi.Argument(
+                "org_id", title="Org ID", description="Org ID", required_on_create=False
             )
         )
         return scheme
@@ -87,12 +94,14 @@ class Input(smi.Script):
 
                 config = {
                     "o11y_url": o11y_url,
+                    "realm": o11y_realm,
                     "access_token": access_token,
+                    "org_id": input_item.get("org_id", ""),
                     "index": input_item.get("index"),
                     "input_name": input_name,
                 }
-
-                data = run_poll(config, logger, event_writer)
+                checkpointer = KVStoreCheckpointer(input_name, session_key, ADDON_NAME)
+                data = run_poll(checkpointer, config, logger, event_writer)
 
                 log.modular_input_end(logger, input_name)
 

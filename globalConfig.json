@@ -148,6 +148,13 @@
                             "required": true
                         },
                         {
+                            "type": "text",
+                            "label": "Observability Cloud Org ID (Optional)",
+                            "help": "Org ID to use for this input.",
+                            "field": "org_id",
+                            "required": false
+                        },
+                        {
                             "type": "singleSelect",
                             "label": "Index Name",
                             "required": true,
@@ -190,6 +197,10 @@
                         "field": "interval"
                     },
                     {
+                        "label": "Org ID",
+                        "field": "org_id"
+                    },
+                    {
                         "label": "Index",
                         "field": "index"
                     },
@@ -206,6 +217,10 @@
                     {
                         "label": "Interval",
                         "field": "interval"
+                    },
+                    {
+                        "label": "Org ID",
+                        "field": "org_id"
                     },
                     {
                         "label": "Index",
@@ -239,7 +254,7 @@
     "meta": {
         "name": "haringester_addon_for_splunk",
         "restRoot": "haringester_addon_for_splunk",
-        "version": "0.2.15",
+        "version": "0.2.22",
         "displayName": "HAR Ingester Add-on for Splunk",
         "schemaVersion": "0.0.3"
     }
