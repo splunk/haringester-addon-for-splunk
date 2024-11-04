@@ -301,7 +301,7 @@
     "meta": {
         "name": "haringester_addon_for_splunk",
         "restRoot": "haringester_addon_for_splunk",
-        "version": "0.2.27",
+        "version": "0.2.29",
         "displayName": "HAR Ingester Add-on for Splunk",
         "schemaVersion": "0.0.8",
         "_uccVersion": "5.50.1"

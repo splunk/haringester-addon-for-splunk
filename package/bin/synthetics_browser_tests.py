@@ -8,7 +8,7 @@ NOW_EPOCH = int(time.time())
 LAST_HALF_HOUR = int(NOW_EPOCH - 1800)
 
 
-class SplunkSynthetics(object):
+class SplunkSynthetics:
     """
     This class is an object that contains all API requests required to get a HAR file
     """
@@ -102,6 +102,8 @@ class SplunkSynthetics(object):
                 "",
             )
 
+            if "postData" in request["request"]:
+                request["request"]["postData"] = "REMOVED"
             # Splunk Synthetics adds additional job-related fields that don't appear to provide value.
             # To keep it consistent, I'm adding standard components only.
             har_data_dict = {

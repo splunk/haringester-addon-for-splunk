@@ -5,7 +5,7 @@ import sys
 EPOCH = datetime(1970, 1, 1)
 
 
-class ThousandEyes(object):
+class ThousandEyes:
     """
     This class handles all API requests for Thousand Eyes Web Transactions
     """
@@ -33,6 +33,7 @@ class ThousandEyes(object):
             har_endpoints.append(har_url)
 
         for ep in har_endpoints:
+            self._logger.debug(f"get_har looking for endpoint: {ep}")
             data = fetch_data(session, ep, "", self._logger)
 
             test_name = data["test"]["testName"]
@@ -43,6 +44,8 @@ class ThousandEyes(object):
                 har = result["har"]["log"]
 
                 for request in har["entries"]:
+                    if "postData" in request["request"]:
+                        request["request"]["postData"] = "REMOVED"
                     start_time = (
                         datetime.strptime(
                             request["startedDateTime"], "%Y-%m-%dT%H:%M:%S.%fZ"
@@ -70,11 +73,12 @@ class ThousandEyes(object):
             pages_url = f"{self.api_endpoint}/test-results/{testId}/web-transactions/agent/{agentId}/round/{round}"
             get_page = fetch_data(session, pages_url, "", self._logger)
             for pr in get_page["results"]:
-                pageNum = 0
+                pageNum = 1
                 for page_list in pr["pages"]:
                     pageNum += page_list.get("pageNum")
 
                 pages.append({"agentId": agentId, "roundId": round, "pageNum": pageNum})
+        self._logger.debug(f"get_page_count returns: {pages}")
         return pages
 
     def get_test_results(self, session, testId) -> list:
