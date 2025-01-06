@@ -60,6 +60,23 @@ class SYNTHETICS_BROWSER_HAR(smi.Script):
                 "org_id", title="Org ID", description="Org ID", required_on_create=False
             )
         )
+        scheme.add_argument(
+            smi.Argument(
+                "all_test_toggle",
+                title="Select All Tests",
+                description="Select All Tests",
+                required_on_create=True,
+            )
+        )
+        scheme.add_argument(
+            smi.Argument(
+                "synth_test",
+                title="Select Specific Tests",
+                description="Select Specific Tests",
+                required_on_create=False,
+            )
+        )
+
         return scheme
 
     def validate_input(self, definition: smi.ValidationDefinition):
@@ -101,12 +118,16 @@ class SYNTHETICS_BROWSER_HAR(smi.Script):
                 platform = account_config.get("platform")
                 o11y_realm = account_config.get("so_realm", 0)
                 o11y_url = f"https://api.{o11y_realm}.signalfx.com"
-
+                all_tests = input_item.get("all_test_toggle")
+                select_tests = ""
+                if all_tests == "0":
+                    select_tests = input_item.get("synth_test").split(",")
                 config = {
                     "platform": platform,
                     "o11y_url": o11y_url,
                     "realm": o11y_realm,
                     "access_token": access_token,
+                    "select_tests": select_tests,
                     "org_id": input_item.get("org_id", ""),
                     "index": input_item.get("index"),
                     "input_name": input_name,

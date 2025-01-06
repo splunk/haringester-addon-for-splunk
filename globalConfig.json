@@ -59,7 +59,7 @@
                             },
                             "modifyFieldsOnValue": [
                                 {
-                                    "fieldValue": "cte",
+                                    "fieldValue": "Cisco Thousand Eyes",
                                     "fieldsToModify": [
                                         {
                                             "fieldId": "so_realm",
@@ -150,6 +150,64 @@
                             "help": "Org ID to use for this input.",
                             "field": "org_id",
                             "required": false
+                        },
+                        {
+                            "field": "all_test_toggle",
+                            "label": "Collect All Synthetic Tests",
+                            "type": "radio",
+                            "help": "Select Yes for all Synthetic tests, No to pick specific tests.",
+                            "defaultValue": "1",
+                            "required": true,
+                            "options": {
+                                "items": [
+                                    {
+                                        "value": "1",
+                                        "label": "Yes"
+                                    },
+                                    {
+                                        "value": "0",
+                                        "label": "No"
+                                    }
+                                ],
+                                "display": true
+                            },
+                            "modifyFieldsOnValue": [
+                                {
+                                    "fieldValue": "0",
+                                    "fieldsToModify": [
+                                        {
+                                            "fieldId": "synth_test",
+                                            "display": true,
+                                            "required": true
+                                        }
+                                    ]
+                                },
+                                {
+                                    "fieldValue": "1",
+                                    "fieldsToModify": [
+                                        {
+                                            "fieldId": "synth_test",
+                                            "display": false,
+                                            "required": false
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "type": "multipleSelect",
+                            "label": "Synthetic Tests",
+                            "field": "synth_test",
+                            "required": false,
+                            "options": {
+                                "dependencies": [
+                                    "account"
+                                ],
+                                "endpointUrl": "splunk_synthetics_get_tests",
+                                "createSearchChoice": true,
+                                "display": false
+                            },
+                            "help": "Select one or more Synthetic Tests"
                         },
                         {
                             "type": "singleSelect",
@@ -244,7 +302,6 @@
             "table": {
                 "actions": [
                     "edit",
-                    "enable",
                     "delete",
                     "clone"
                 ],
@@ -301,9 +358,9 @@
     "meta": {
         "name": "haringester_addon_for_splunk",
         "restRoot": "haringester_addon_for_splunk",
-        "version": "1.0.0",
+        "version": "1.0.1",
         "displayName": "HAR Ingester Add-on for Splunk",
-        "schemaVersion": "0.0.8",
-        "_uccVersion": "5.50.1"
+        "schemaVersion": "0.0.9",
+        "_uccVersion": "5.55.0"
     }
 }

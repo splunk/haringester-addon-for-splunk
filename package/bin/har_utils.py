@@ -3,6 +3,24 @@ from solnlib import conf_manager, log
 from splunklib import modularinput as smi
 import json, requests, sys, traceback
 
+ADDON_NAME = "haringester_addon_for_splunk"
+
+
+def get_account_config(session_key: str, logger):
+    try:
+        cfm = conf_manager.ConfManager(
+            session_key,
+            ADDON_NAME,
+            realm=f"__REST_CREDENTIAL__#{ADDON_NAME}#configs/conf-haringester_addon_for_splunk_account",
+        )
+        account_conf_file = cfm.get_conf("haringester_addon_for_splunk_account")
+        return account_conf_file
+    except Exception:
+        logger.error(
+            f"Error occurred while reading haringester_addon_for_splunk_account.conf - {traceback.print_exc()}"
+        )
+        return None
+
 
 def make_session(header):
     with requests.Session() as session:

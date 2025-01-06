@@ -23,6 +23,8 @@ class SplunkSynthetics:
         self.org_id = config["org_id"]
         self.realm = config["realm"]
         self._logger = logger
+        self.select_tests = config["select_tests"]
+        self._logger.debug(f"tests={self.select_tests}")
 
     def get_artifacts(self, session: requests.Session, active_tests: dict) -> list:
         """
@@ -184,15 +186,18 @@ def run_poll(checkpointer, config, logger, event_writer):
     """
     client = SplunkSynthetics(config, logger)
     session = make_session(client.header)
-
     get_active = client.get_active_checks(session)
 
+    select_tests_only = config.get("select_tests")
     if not get_active:
         logger.error("No active checks found.")
         sys.exit()
 
     # For each active check, find available artifacts
     for test in get_active:
+        test_name = test.get("test_name")
+        if select_tests_only and test_name not in select_tests_only:
+            continue
         har_url = client.get_artifacts(session, test)
 
         # If the HAR artifact exists, get artifact and write it to Splunk
@@ -216,8 +221,7 @@ def run_poll(checkpointer, config, logger, event_writer):
             )
 
             if synthetics_lastrun > recent_checkpoint:
-                test_id = test.get("test_id")
-                test_name = test.get("test_name")
+
                 data = client.get_har(session, test_id, test_name, har_url)
 
                 write_events(data, config, logger, event_writer)
