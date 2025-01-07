@@ -81,9 +81,23 @@ class SplunkSynthetics:
 
         # This extracts each page reference (i.e page 1 in the Synthetic check) and it's url
         har_page_data = [
-            {"page_ref": page["id"], "page_url": page["title"]}
+            {
+                "page_ref": page["id"],
+                "page_url": page["title"],
+                "web_vitals": page["_webVitals"],
+            }
             for page in har_data["log"]["pages"]
         ]
+
+        btransaction_data = []
+        if har_data["log"]["_groupData"]:
+            btransaction_data = [
+                {
+                    "pos": step["position"],
+                    "name": step["name"],
+                }
+                for step in har_data["log"]["_groupData"]
+            ]
 
         har_data_arr = []
 
@@ -104,11 +118,24 @@ class SplunkSynthetics:
                 "",
             )
 
+            business_transaction = ""
+
+            if "_btref" in request:
+                business_transaction = next(
+                    (
+                        bt["name"]
+                        for bt in btransaction_data
+                        if bt["pos"] == request["_btref"]
+                    ),
+                    "",
+                )
+
             if "postData" in request["request"]:
                 request["request"]["postData"] = "REMOVED"
             # Splunk Synthetics adds additional job-related fields that don't appear to provide value.
             # To keep it consistent, I'm adding standard components only.
             har_data_dict = {
+                "business_transaction": business_transaction,
                 "page_url": page_url,
                 "pageref": request["pageref"],
                 "request": request["request"],
