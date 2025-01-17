@@ -84,6 +84,7 @@ class SplunkSynthetics:
             {
                 "page_ref": page["id"],
                 "page_url": page["title"],
+                "startedDateTime": synthetics_detail_run_time,
                 "web_vitals": page["_webVitals"],
             }
             for page in har_data["log"]["pages"]
@@ -100,7 +101,8 @@ class SplunkSynthetics:
             ]
 
         har_data_arr = []
-
+        for page_data in har_page_data:
+            har_data_arr.append(page_data)
         # The "entries" section in the HAR file is where each request is stored
         for request in har_data["log"]["entries"]:
             start_time = (
