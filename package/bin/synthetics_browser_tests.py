@@ -23,6 +23,8 @@ class SplunkSynthetics:
         self.org_id = config["org_id"]
         self.realm = config["realm"]
         self._logger = logger
+        self.select_tests = config["select_tests"]
+        self._logger.debug(f"tests={self.select_tests}")
 
     def get_artifacts(self, session: requests.Session, active_tests: dict) -> list:
         """
@@ -79,12 +81,28 @@ class SplunkSynthetics:
 
         # This extracts each page reference (i.e page 1 in the Synthetic check) and it's url
         har_page_data = [
-            {"page_ref": page["id"], "page_url": page["title"]}
+            {
+                "page_ref": page["id"],
+                "page_url": page["title"],
+                "startedDateTime": synthetics_detail_run_time,
+                "web_vitals": page["_webVitals"],
+            }
             for page in har_data["log"]["pages"]
         ]
 
-        har_data_arr = []
+        btransaction_data = []
+        if har_data["log"]["_groupData"]:
+            btransaction_data = [
+                {
+                    "pos": step["position"],
+                    "name": step["name"],
+                }
+                for step in har_data["log"]["_groupData"]
+            ]
 
+        har_data_arr = []
+        for page_data in har_page_data:
+            har_data_arr.append(page_data)
         # The "entries" section in the HAR file is where each request is stored
         for request in har_data["log"]["entries"]:
             start_time = (
@@ -102,11 +120,24 @@ class SplunkSynthetics:
                 "",
             )
 
+            business_transaction = ""
+
+            if "_btref" in request:
+                business_transaction = next(
+                    (
+                        bt["name"]
+                        for bt in btransaction_data
+                        if bt["pos"] == request["_btref"]
+                    ),
+                    "",
+                )
+
             if "postData" in request["request"]:
                 request["request"]["postData"] = "REMOVED"
             # Splunk Synthetics adds additional job-related fields that don't appear to provide value.
             # To keep it consistent, I'm adding standard components only.
             har_data_dict = {
+                "business_transaction": business_transaction,
                 "page_url": page_url,
                 "pageref": request["pageref"],
                 "request": request["request"],
@@ -184,15 +215,18 @@ def run_poll(checkpointer, config, logger, event_writer):
     """
     client = SplunkSynthetics(config, logger)
     session = make_session(client.header)
-
     get_active = client.get_active_checks(session)
 
+    select_tests_only = config.get("select_tests")
     if not get_active:
         logger.error("No active checks found.")
         sys.exit()
 
     # For each active check, find available artifacts
     for test in get_active:
+        test_name = test.get("test_name")
+        if select_tests_only and test_name not in select_tests_only:
+            continue
         har_url = client.get_artifacts(session, test)
 
         # If the HAR artifact exists, get artifact and write it to Splunk
@@ -216,8 +250,7 @@ def run_poll(checkpointer, config, logger, event_writer):
             )
 
             if synthetics_lastrun > recent_checkpoint:
-                test_id = test.get("test_id")
-                test_name = test.get("test_name")
+
                 data = client.get_har(session, test_id, test_name, har_url)
 
                 write_events(data, config, logger, event_writer)
