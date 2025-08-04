@@ -32,27 +32,28 @@ class SyntheticTests(admin.MConfigHandler):
         }
         session = make_session(header)
 
-        results = fetch_data(session, checks_url, params, logger)
+        while next_page > 0:
+            results = fetch_data(session, checks_url, params, logger)
 
-        if not results.get("tests"):
-            return None
+            if not results.get("tests"):
+                return None
 
-        if "tests" in results:
-            if not results.get("nextPageLink"):
-                next_page = 0
-            else:
-                next_page = results.get("nextPageLink")
-            # logger.debug(f"next page after api call is {next_page}")
-            for test in results.get("tests"):
+            if "tests" in results:
+                if not results.get("nextPageLink"):
+                    next_page = 0
+                else:
+                    next_page = results.get("nextPageLink")
+                # logger.debug(f"next page after api call is {next_page}")
+                for test in results.get("tests"):
 
-                if not test["lastRunAt"]:
-                    logger.warning(f'No run history for {test["id"]}')
-                    continue
-                test_name = test["name"]
+                    if not test["lastRunAt"]:
+                        logger.warning(f'No run history for {test["id"]}')
+                        continue
+                    test_name = test["name"]
 
-                conf_info[test_name].append("name", test_name)
-        # for attr in dir(conf_info):
-        #    logger.debug(f"conf_info.{attr}={getattr(conf_info, attr)}")
+                    conf_info[test_name].append("name", test_name)
+            # for attr in dir(conf_info):
+            #    logger.debug(f"conf_info.{attr}={getattr(conf_info, attr)}")
 
 
 def main():
