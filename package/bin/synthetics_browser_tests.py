@@ -28,34 +28,31 @@ class SplunkSynthetics:
 
     def get_artifacts(self, session: requests.Session, active_tests: dict) -> list:
         """
-        This function queries the Artifacts endpoint for each possible location for the runtime given
+        This function queries the Artifacts endpoint for the last run location for the runtime given
         """
         test_id = active_tests.get("test_id")
         run_epoch = active_tests.get("last_test_run")
-        location_list = active_tests.get("location_list")
+        last_test_location = active_tests.get("last_test_location")
 
-        for location in location_list:
-            artifact_url = f"{self.o11y_url}/v2/synthetics/tests/{test_id}/artifacts?locationId={location}&timestamp={run_epoch}"
+        artifact_url = f"{self.o11y_url}/v2/synthetics/tests/{test_id}/artifacts?locationId={last_test_location}&timestamp={run_epoch}"
 
-            artifacts = fetch_data(session, artifact_url, "", self._logger)
+        artifacts = fetch_data(session, artifact_url, "", self._logger)
 
-            if not artifacts.get("artifacts"):
+        if not artifacts.get("artifacts"):
+            self._logger.debug(f"No artifacts found for {test_id} and {run_epoch}.")
+            return None
+
+        self._logger.debug(f"Artifacts found: {artifacts}")
+
+        for artifact in artifacts.get("artifacts"):
+            if artifact.get("type") != "har":
                 continue
-            self._logger.debug(f"Artifacts found: {artifacts}")
 
-            for artifact in artifacts.get("artifacts"):
-                if artifact.get("type") != "har":
-                    continue
+            self._logger.debug(f"Found har artifact: {artifact['url']}")
 
-                self._logger.debug(f"Found har artifact: {artifact['url']}")
+            # Returns the artifact URL, corresponding Synthetics location, and Synthetics run time in epoch as a list
 
-                artifact["location"] = location
-                # Returns the artifact URL, corresponding Synthetics location, and Synthetics run time in epoch as a list
-
-                return [artifact["url"], artifact["location"], run_epoch]
-
-        self._logger.debug(f"No artifacts found for {test_id} and {run_epoch}.")
-        return None
+            return [artifact["url"], last_test_location, run_epoch]
 
     def get_har(
         self, session: requests.Session, test_id: int, test_name: str, har_url: list
@@ -202,7 +199,7 @@ class SplunkSynthetics:
                                 ).total_seconds()
                                 * 1000
                             ),
-                            "location_list": test["locationIds"],
+                            "last_test_location": test["lastRunLocationId"],
                         }
                     )
 
@@ -225,39 +222,39 @@ def run_poll(checkpointer, config, logger, event_writer):
     # For each active check, find available artifacts
     for test in get_active:
         test_name = test.get("test_name")
+        test_id = test.get("test_id")
+        last_test_location = test.get("last_test_location")
+        last_test_run = test.get("last_test_run")
+
         if select_tests_only and test_name not in select_tests_only:
             continue
-        har_url = client.get_artifacts(session, test)
 
-        # If the HAR artifact exists, get artifact and write it to Splunk
-        if har_url:
-            test_id = test.get("test_id")
+        checkpoint_name = f"{test_id}_{last_test_location}"
+        recent_checkpoint = checkpointer.get(checkpoint_name)
+        logger.debug(f"Checkpoint data: {recent_checkpoint}")
 
-            synthetics_location = har_url[1]
-            synthetics_lastrun = har_url[2]
-            checkpoint_name = f"{test_id}_{synthetics_location}"
+        if recent_checkpoint is not None:
+            recent_checkpoint = recent_checkpoint.get("checkpoint")
+        else:
+            recent_checkpoint = 0
 
-            recent_checkpoint = checkpointer.get(checkpoint_name)
-            logger.debug(f"Checkpoint data: {recent_checkpoint}")
+        logger.debug(
+            f"synthetics_lastrun={last_test_location} recent_checkpoint={recent_checkpoint}"
+        )
 
-            if recent_checkpoint is not None:
-                recent_checkpoint = recent_checkpoint.get("checkpoint")
-            else:
-                recent_checkpoint = 0
+        if last_test_run > recent_checkpoint:
+            har_url = client.get_artifacts(session, test)
 
-            logger.debug(
-                f"synthetics_lastrun={synthetics_lastrun} recent_checkpoint={recent_checkpoint}"
-            )
-
-            if synthetics_lastrun > recent_checkpoint:
+            # If the HAR artifact exists, get artifact and write it to Splunk
+            if har_url:
 
                 data = client.get_har(session, test_id, test_name, har_url)
 
                 write_events(data, config, logger, event_writer)
 
-                checkpointer.update(checkpoint_name, {"checkpoint": synthetics_lastrun})
-            else:
-                logger.debug(
-                    f"Already written data for test={test_id} location={har_url[1]} runtime={synthetics_lastrun}"
-                )
+                checkpointer.update(checkpoint_name, {"checkpoint": last_test_run})
+        else:
+            logger.debug(
+                f"Already written data for test={test_id} location={last_test_location} runtime={last_test_run}"
+            )
     session.close()
